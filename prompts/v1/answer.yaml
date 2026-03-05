@@ -1,0 +1,32 @@
+version: v1
+name: answer
+description: Prompt for generating an answer from retrieved context.
+
+template: |
+  Given the following retrieved context chunks and the user's question,
+  provide a clear, accurate answer.
+
+  ## Retrieved Context
+  {% for chunk in chunks %}
+  [Source {{loop.index}}] ({{chunk.source_type}} — {{chunk.title}})
+  {{chunk.content}}
+  {% endfor %}
+
+  ## Conversation History
+  {% for msg in history %}
+  {{msg.role}}: {{msg.content}}
+  {% endfor %}
+
+  ## Current Question
+  {{question}}
+
+  ## Instructions
+  - Cite sources inline as [Source N].
+  - If multiple sources agree, prefer the most recent one.
+  - If context is insufficient, state what is missing.
+  - Be concise but thorough.
+
+variables:
+  - chunks
+  - history
+  - question

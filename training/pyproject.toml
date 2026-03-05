@@ -1,0 +1,22 @@
+[project]
+name = "support-copilot-training"
+version = "0.1.0"
+description = "Training pipeline: answer-style fine-tune + reranker training"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "bert-score>=0.3.13",
+    "datasets>=3.2.0",
+    "google-cloud-bigquery>=3.27.0",
+    "google-cloud-storage>=2.19.0",
+    "google-genai>=1.47.0",
+    "numpy>=1.26.0",
+    "openai>=1.58.0",
+    "peft>=0.14.0",
+    "rouge-score>=0.1.2",
+    "sentence-transformers>=3.3.0",
+    "torch>=2.5.0",
+    "transformers>=4.47.0",
+    "typer>=0.15.0",
+    "wandb>=0.19.0",
+]

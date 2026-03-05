@@ -1,0 +1,83 @@
+name: App CI/CD
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install API deps and test
+        run: |
+          pip install uv
+          cd api && uv sync --frozen
+          cd api && uv run pytest tests/ -v
+
+  deploy:
+    if: contains(github.event.head_commit.message, '/deploy-app')
+    needs: test
+    runs-on: ubuntu-latest
+
+    env:
+      REGISTRY: us-central1-docker.pkg.dev
+      PROJECT: ${{ secrets.GCP_PROJECT }}
+      REPO: images
+      REGION: us-central1
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGISTRY }} --quiet
+
+      - name: Build and push all images
+        run: |
+          for svc in inference api ui; do
+            docker build -t $REGISTRY/$PROJECT/$REPO/$svc:${{ github.sha }} \
+                          -t $REGISTRY/$PROJECT/$REPO/$svc:latest \
+                          ./$svc
+            docker push $REGISTRY/$PROJECT/$REPO/$svc:${{ github.sha }}
+            docker push $REGISTRY/$PROJECT/$REPO/$svc:latest
+          done
+
+      - name: Deploy inference to Cloud Run
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: support-copilot-inference
+          image: ${{ env.REGISTRY }}/${{ env.PROJECT }}/${{ env.REPO }}/inference:${{ github.sha }}
+          region: ${{ env.REGION }}
+          env_vars: |
+            GCP_PROJECT=${{ secrets.GCP_PROJECT }}
+            PROMPT_VERSION=v1
+
+      - name: Deploy API to Cloud Run
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: support-copilot-api
+          image: ${{ env.REGISTRY }}/${{ env.PROJECT }}/${{ env.REPO }}/api:${{ github.sha }}
+          region: ${{ env.REGION }}
+          env_vars: |
+            GCP_PROJECT=${{ secrets.GCP_PROJECT }}
+            INFERENCE_URL=https://support-copilot-inference-${{ env.REGION }}.a.run.app
+
+      - name: Deploy UI to Cloud Run
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: support-copilot-ui
+          image: ${{ env.REGISTRY }}/${{ env.PROJECT }}/${{ env.REPO }}/ui:${{ github.sha }}
+          region: ${{ env.REGION }}
+          env_vars: |
+            NEXT_PUBLIC_API_URL=https://support-copilot-api-${{ env.REGION }}.a.run.app

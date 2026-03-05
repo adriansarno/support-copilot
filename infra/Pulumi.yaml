@@ -1,0 +1,6 @@
+name: support-copilot-infra
+runtime:
+  name: python
+  options:
+    virtualenv: venv
+description: Infrastructure for Customer Support RAG Copilot

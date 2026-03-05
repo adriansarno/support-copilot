@@ -1,0 +1,23 @@
+[project]
+name = "support-copilot-api"
+version = "0.1.0"
+description = "Service API: chat, suggest-reply, feedback"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115.0",
+    "google-cloud-bigquery>=3.27.0",
+    "google-cloud-secret-manager>=2.21.0",
+    "httpx>=0.28.0",
+    "pydantic>=2.10.0",
+    "pydantic-settings>=2.7.0",
+    "python-jose[cryptography]>=3.3.0",
+    "sse-starlette>=2.2.0",
+    "uvicorn>=0.34.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.24.0",
+]

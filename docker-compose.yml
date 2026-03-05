@@ -1,0 +1,59 @@
+version: "3.9"
+
+services:
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    env_file: .env
+    environment:
+      - INFERENCE_URL=http://inference:8001
+    depends_on:
+      - inference
+    volumes:
+      - ./prompts:/app/prompts:ro
+
+  inference:
+    build:
+      context: ./inference
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8001"
+    env_file: .env
+    volumes:
+      - ./prompts:/app/prompts:ro
+      - model-cache:/app/model-cache
+
+  ui:
+    build:
+      context: ./ui
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+
+  acquisition:
+    build:
+      context: ./acquisition
+      dockerfile: Dockerfile
+    env_file: .env
+    profiles:
+      - pipeline
+    volumes:
+      - ./data:/app/data
+
+  training:
+    build:
+      context: ./training
+      dockerfile: Dockerfile
+    env_file: .env
+    profiles:
+      - pipeline
+    volumes:
+      - model-cache:/app/model-cache
+
+volumes:
+  model-cache:

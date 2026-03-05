@@ -1,0 +1,34 @@
+version: v1
+name: suggest_reply
+description: Prompt for drafting a customer-facing reply based on a support ticket.
+
+template: |
+  You are drafting a reply that a support agent will send to a customer.
+
+  ## Ticket Context
+  Subject: {{ticket_subject}}
+  Customer message:
+  {{ticket_body}}
+
+  ## Retrieved Knowledge
+  {% for chunk in chunks %}
+  [Source {{loop.index}}] ({{chunk.source_type}} — {{chunk.title}})
+  {{chunk.content}}
+  {% endfor %}
+
+  ## Agent Notes
+  {{agent_notes}}
+
+  ## Instructions
+  - Write a professional, empathetic reply addressed to the customer.
+  - Reference specific product details from the knowledge base.
+  - Suggest next steps if applicable.
+  - Keep the tone warm but concise.
+  - Do NOT include internal source citations in the customer-facing reply.
+  - Output ONLY the reply text, no extra commentary.
+
+variables:
+  - ticket_subject
+  - ticket_body
+  - chunks
+  - agent_notes

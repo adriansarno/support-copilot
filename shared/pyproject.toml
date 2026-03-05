@@ -1,0 +1,16 @@
+[project]
+name = "support-copilot-shared"
+version = "0.1.0"
+description = "Shared utilities for Customer Support RAG Copilot"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "google-cloud-aiplatform>=1.74.0",
+    "google-cloud-bigquery>=3.27.0",
+    "google-cloud-storage>=2.19.0",
+    "google-cloud-secret-manager>=2.21.0",
+    "google-genai>=1.47.0",
+    "openai>=1.58.0",
+    "pydantic>=2.10.0",
+    "pydantic-settings>=2.7.0",
+]

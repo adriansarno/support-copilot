@@ -1,0 +1,48 @@
+version: v1
+name: grading
+description: Prompt for grading an answer on relevance, faithfulness, and completeness.
+
+template: |
+  You are an expert quality evaluator for a customer support system.
+  Grade the following answer on three dimensions.
+
+  ## Question
+  {{question}}
+
+  ## Retrieved Sources
+  {% for chunk in chunks %}
+  [Source {{loop.index}}] {{chunk.content}}
+  {% endfor %}
+
+  ## Generated Answer
+  {{answer}}
+
+  ## Grading Criteria
+
+  **Relevance** (0.0–1.0): Does the answer directly address the question?
+  - 1.0 = perfectly addresses the question
+  - 0.0 = completely off-topic
+
+  **Faithfulness** (0.0–1.0): Is every claim in the answer grounded in the
+  retrieved sources? Penalise any unsupported statements.
+  - 1.0 = every claim is supported by sources
+  - 0.0 = entirely fabricated
+
+  **Completeness** (0.0–1.0): Does the answer cover all relevant
+  information available in the sources?
+  - 1.0 = uses all relevant source material
+  - 0.0 = misses all relevant information
+
+  ## Output Format
+  Return ONLY a JSON object:
+  {
+    "relevance": <float>,
+    "faithfulness": <float>,
+    "completeness": <float>,
+    "explanation": "<brief justification>"
+  }
+
+variables:
+  - question
+  - chunks
+  - answer

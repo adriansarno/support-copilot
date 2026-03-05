@@ -1,0 +1,4 @@
+config:
+  gcp:project: support-copilot-dev
+  gcp:region: us-central1
+  support-copilot:environment: dev
