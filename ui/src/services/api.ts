@@ -129,6 +129,39 @@ export async function suggestReply(
 // Feedback API
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Upload API
+// ---------------------------------------------------------------------------
+
+export interface UploadResponse {
+  uploaded: string[];
+  errors: string[];
+  bucket?: string;
+  message: string;
+}
+
+export async function uploadDocuments(files: File[]): Promise<UploadResponse> {
+  const formData = new FormData();
+  for (const file of files) {
+    formData.append("files", file);
+  }
+  // Use fetch so browser sets multipart/form-data with boundary (axios default Content-Type would break this)
+  const resp = await fetch(`${API_URL}/upload/`, {
+    method: "POST",
+    headers: { "X-API-Key": API_KEY },
+    body: formData,
+  });
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({ detail: resp.statusText }));
+    throw new Error(typeof err.detail === "string" ? err.detail : JSON.stringify(err.detail));
+  }
+  return resp.json();
+}
+
+// ---------------------------------------------------------------------------
+// Feedback API
+// ---------------------------------------------------------------------------
+
 export async function submitFeedback(
   chatId: string,
   messageId: string,

@@ -2,8 +2,12 @@ from __future__ import annotations
 
 import os
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic_settings import BaseSettings
+
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+_ENV_FILE = _PROJECT_ROOT / ".env" if (_PROJECT_ROOT / ".env").exists() else ".env"
 
 
 class Settings(BaseSettings):
@@ -19,6 +23,7 @@ class Settings(BaseSettings):
 
     # GCS
     gcs_bucket: str = "support-copilot-artifacts"
+    gcs_raw_docs_bucket: str = ""  # e.g. support-copilot-1772757287-raw-docs; if empty, uses {gcp_project}-raw-docs
 
     # Vertex Vector Search
     vertex_index_id: str = ""
@@ -51,7 +56,7 @@ class Settings(BaseSettings):
     # Inference service URL (used by API to call inference)
     inference_url: str = "http://localhost:8001"
 
-    model_config = {"env_file": ".env", "extra": "ignore"}
+    model_config = {"env_file": str(_ENV_FILE), "extra": "ignore"}
 
     @property
     def bq_chunks_full(self) -> str:

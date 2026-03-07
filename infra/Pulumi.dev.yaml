@@ -1,4 +1,6 @@
 config:
-  gcp:project: support-copilot-dev
+  gcp:project: support-copilot-1772757287
   gcp:region: us-central1
   support-copilot:environment: dev
+  support-copilot-infra:api_key:
+    secure: AAABAG3IoUajGh72eA6bmZJGs+cKNfiTQB+eTLngWmzLAVtqYVrp1qRQOFCbLnurmisFKNx0NcE/kiDdbIz/I7hlKkzQfJNsCJ7W8RNDPbudQJmd9IHE59dzKuO5HdMI

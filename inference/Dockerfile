@@ -23,10 +23,13 @@ RUN set -ex; \
 USER app
 WORKDIR /app
 
-COPY --chown=app:app pyproject.toml uv.lock* ./
+COPY --chown=app:app inference/pyproject.toml inference/uv.lock* ./
 RUN uv sync --frozen
 
-COPY --chown=app:app . ./
+COPY --chown=app:app shared/ ./shared/
+COPY --chown=app:app prompts/ ./prompts/
+COPY --chown=app:app inference/ ./inference/
 
+ENV PYTHONPATH=/app
 EXPOSE 8001
-CMD ["uv", "run", "uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8001"]
+CMD ["/home/app/.venv/bin/uvicorn", "inference.server:app", "--host", "0.0.0.0", "--port", "8001"]

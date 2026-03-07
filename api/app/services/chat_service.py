@@ -8,10 +8,22 @@ import uuid
 from datetime import datetime, timezone
 
 import httpx
+import google.auth.transport.requests
+import google.oauth2.id_token
 
 from api.app.config import get_api_settings
 
 logger = logging.getLogger(__name__)
+
+
+def _get_identity_token(audience: str) -> str | None:
+    """Fetch a Google identity token for service-to-service auth on Cloud Run."""
+    try:
+        request = google.auth.transport.requests.Request()
+        return google.oauth2.id_token.fetch_id_token(request, audience)
+    except Exception:
+        logger.debug("Could not fetch identity token (likely running locally)")
+        return None
 
 _chats: dict[str, dict] = {}
 
@@ -74,6 +86,14 @@ def get_history(chat_id: str) -> list[dict[str, str]]:
     ]
 
 
+def _inference_headers(inference_url: str) -> dict[str, str]:
+    headers: dict[str, str] = {}
+    token = _get_identity_token(inference_url)
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    return headers
+
+
 async def call_inference_chat(
     question: str,
     history: list[dict],
@@ -83,9 +103,11 @@ async def call_inference_chat(
 ) -> dict:
     """Call the inference service /inference/chat endpoint."""
     settings = get_api_settings()
+    headers = _inference_headers(settings.inference_url)
     async with httpx.AsyncClient(timeout=120.0) as client:
         resp = await client.post(
             f"{settings.inference_url}/inference/chat",
+            headers=headers,
             json={
                 "question": question,
                 "history": history,
@@ -106,9 +128,11 @@ async def call_inference_suggest(
 ) -> dict:
     """Call the inference service /inference/suggest endpoint."""
     settings = get_api_settings()
+    headers = _inference_headers(settings.inference_url)
     async with httpx.AsyncClient(timeout=120.0) as client:
         resp = await client.post(
             f"{settings.inference_url}/inference/suggest",
+            headers=headers,
             json={
                 "ticket_subject": ticket_subject,
                 "ticket_body": ticket_body,

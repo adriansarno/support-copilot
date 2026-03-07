@@ -8,6 +8,7 @@ gcp_config = pulumi.Config("gcp")
 project = gcp_config.require("project")
 region = gcp_config.require("region")
 environment = config.get("environment") or "dev"
+api_key = config.get_secret("api_key") or config.get("api_key")
 
 # ---------------------------------------------------------------------------
 # BigQuery
@@ -88,6 +89,16 @@ raw_docs_bucket = gcp.storage.Bucket(
     project=project,
 )
 
+# Grant API service (Cloud Run default compute SA) objectCreator for uploads
+proj = gcp.organizations.get_project(project_id=project)
+api_compute_sa = f"{proj.number}-compute@developer.gserviceaccount.com"
+gcp.storage.BucketIAMMember(
+    "raw-docs-api-upload",
+    bucket=raw_docs_bucket.name,
+    role="roles/storage.objectCreator",
+    member=f"serviceAccount:{api_compute_sa}",
+)
+
 # ---------------------------------------------------------------------------
 # Artifact Registry
 # ---------------------------------------------------------------------------
@@ -141,54 +152,72 @@ for secret_name in ["openai-api-key", "deepseek-api-key", "wandb-api-key", "jwt-
 # Cloud Run Services
 # ---------------------------------------------------------------------------
 
+INFERENCE_TAG = "1772856289" # unix epoch - is the timestamp of the image
+API_TAG= "1772877424"
+UI_TAG = "1772876322" 
+
 inference_service = gcp.cloudrunv2.Service(
     "inference-service",
     name="support-copilot-inference",
     location=region,
     project=project,
-    template=gcp.cloudrunv2.ServiceTemplateArgs(
-        containers=[
-            gcp.cloudrunv2.ServiceTemplateContainerArgs(
-                image=f"{region}-docker.pkg.dev/{project}/images/inference:latest",
-                ports=[gcp.cloudrunv2.ServiceTemplateContainerPortArgs(container_port=8001)],
-                resources=gcp.cloudrunv2.ServiceTemplateContainerResourcesArgs(
-                    limits={"memory": "2Gi", "cpu": "2"},
-                ),
-                envs=[
-                    gcp.cloudrunv2.ServiceTemplateContainerEnvArgs(name="GCP_PROJECT", value=project),
-                    gcp.cloudrunv2.ServiceTemplateContainerEnvArgs(name="GCP_REGION", value=region),
-                    gcp.cloudrunv2.ServiceTemplateContainerEnvArgs(name="PROMPT_VERSION", value="v1"),
+    template={
+        "containers": [
+            {
+                "image": f"{region}-docker.pkg.dev/{project}/images/inference:{INFERENCE_TAG}",
+                "ports": {"container_port": 8001},
+                "resources": {"limits": {"memory": "2Gi", "cpu": "2"}},
+                "envs": [
+                    {"name": "GCP_PROJECT", "value": project},
+                    {"name": "GCP_REGION", "value": region},
+                    {"name": "PROMPT_VERSION", "value": "v1"},
+                    {"name": "SKIP_RERANKER", "value": "true"},
                 ],
-            )
+                "startup_probe": {
+                    "http_get": {"path": "/health", "port": 8001},
+                    "initial_delay_seconds": 5,
+                    "period_seconds": 10,
+                    "failure_threshold": 30,
+                    "timeout_seconds": 5,
+                },
+            }
         ],
-        scaling=gcp.cloudrunv2.ServiceTemplateScalingArgs(min_instance_count=0, max_instance_count=5),
-    ),
+        "scaling": {"min_instance_count": 0, "max_instance_count": 5},
+        "timeout": "600s",
+    },
 )
+
+api_envs = [
+    {"name": "GCP_PROJECT", "value": project},
+    {"name": "GCS_RAW_DOCS_BUCKET", "value": raw_docs_bucket.name},
+    {"name": "INFERENCE_URL", "value": inference_service.uri},
+]
+if api_key is not None:
+    api_envs.append({"name": "API_KEY", "value": api_key})
 
 api_service = gcp.cloudrunv2.Service(
     "api-service",
     name="support-copilot-api",
     location=region,
     project=project,
-    template=gcp.cloudrunv2.ServiceTemplateArgs(
-        containers=[
-            gcp.cloudrunv2.ServiceTemplateContainerArgs(
-                image=f"{region}-docker.pkg.dev/{project}/images/api:latest",
-                ports=[gcp.cloudrunv2.ServiceTemplateContainerPortArgs(container_port=8000)],
-                resources=gcp.cloudrunv2.ServiceTemplateContainerResourcesArgs(
-                    limits={"memory": "1Gi", "cpu": "1"},
-                ),
-                envs=[
-                    gcp.cloudrunv2.ServiceTemplateContainerEnvArgs(name="GCP_PROJECT", value=project),
-                    gcp.cloudrunv2.ServiceTemplateContainerEnvArgs(
-                        name="INFERENCE_URL",
-                        value=inference_service.uri,
-                    ),
-                ],
-            )
+    template={
+        "containers": [
+            {
+                "image": f"{region}-docker.pkg.dev/{project}/images/api:{API_TAG}",
+                "ports": {"container_port": 8000},
+                "resources": {"limits": {"memory": "1Gi", "cpu": "1"}},
+                "envs": api_envs,
+                "startup_probe": {
+                    "http_get": {"path": "/health", "port": 8000},
+                    "initial_delay_seconds": 5,
+                    "period_seconds": 10,
+                    "failure_threshold": 30,
+                    "timeout_seconds": 5,
+                },
+            }
         ],
-        scaling=gcp.cloudrunv2.ServiceTemplateScalingArgs(min_instance_count=0, max_instance_count=10),
-    ),
+        "scaling": {"min_instance_count": 0, "max_instance_count": 10},
+    },
 )
 
 ui_service = gcp.cloudrunv2.Service(
@@ -196,24 +225,19 @@ ui_service = gcp.cloudrunv2.Service(
     name="support-copilot-ui",
     location=region,
     project=project,
-    template=gcp.cloudrunv2.ServiceTemplateArgs(
-        containers=[
-            gcp.cloudrunv2.ServiceTemplateContainerArgs(
-                image=f"{region}-docker.pkg.dev/{project}/images/ui:latest",
-                ports=[gcp.cloudrunv2.ServiceTemplateContainerPortArgs(container_port=3000)],
-                resources=gcp.cloudrunv2.ServiceTemplateContainerResourcesArgs(
-                    limits={"memory": "512Mi", "cpu": "1"},
-                ),
-                envs=[
-                    gcp.cloudrunv2.ServiceTemplateContainerEnvArgs(
-                        name="NEXT_PUBLIC_API_URL",
-                        value=api_service.uri,
-                    ),
+    template={
+        "containers": [
+            {
+                "image": f"{region}-docker.pkg.dev/{project}/images/ui:{UI_TAG}",
+                "ports": {"container_port": 3000},
+                "resources": {"limits": {"memory": "512Mi", "cpu": "1"}},
+                "envs": [
+                    {"name": "NEXT_PUBLIC_API_URL", "value": api_service.uri},
                 ],
-            )
+            }
         ],
-        scaling=gcp.cloudrunv2.ServiceTemplateScalingArgs(min_instance_count=0, max_instance_count=5),
-    ),
+        "scaling": {"min_instance_count": 0, "max_instance_count": 5},
+    },
 )
 
 # ---------------------------------------------------------------------------

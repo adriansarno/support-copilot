@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import sys
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -31,38 +32,61 @@ pipeline: RAGPipeline | None = None
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global pipeline
-    s = get_settings()
+    try:
+        s = get_settings()
 
-    embed = EmbeddingProvider(
-        provider=s.embedding_provider,
-        model=s.embedding_model,
-        dimension=s.embedding_dimension,
-        api_key=s.openai_api_key,
-    )
-    bm25 = BM25Retriever(s.gcp_project, s.bq_dataset, s.bq_chunks_table)
-    vector = VectorRetriever(
-        project=s.gcp_project,
-        region=s.gcp_region,
-        index_endpoint_id=s.vertex_index_endpoint_id,
-        deployed_index_id="deployed_index",
-        bq_dataset=s.bq_dataset,
-        bq_table=s.bq_chunks_table,
-    )
-    reranker = CrossEncoderReranker()
-    llm = get_llm_provider()
-    prompts = PromptManager(prompts_dir="/app/prompts", version=s.prompt_version)
-    grader = AnswerGrader(llm, prompts)
+        embed = EmbeddingProvider(
+            provider=s.embedding_provider,
+            model=s.embedding_model,
+            dimension=s.embedding_dimension,
+            api_key=s.openai_api_key,
+            gcp_project=s.gcp_project,
+            gcp_region=s.gcp_region,
+        )
+        bm25 = BM25Retriever(s.gcp_project, s.bq_dataset, s.bq_chunks_table)
 
-    pipeline = RAGPipeline(
-        bm25_retriever=bm25,
-        vector_retriever=vector,
-        embedding_provider=embed,
-        reranker=reranker,
-        llm_provider=llm,
-        prompt_manager=prompts,
-        grader=grader,
-    )
-    logger.info("Inference pipeline initialized")
+        vector = None
+        if s.vertex_index_endpoint_id:
+            try:
+                vector = VectorRetriever(
+                    project=s.gcp_project,
+                    region=s.gcp_region,
+                    index_endpoint_id=s.vertex_index_endpoint_id,
+                    deployed_index_id="deployed_index",
+                    bq_dataset=s.bq_dataset,
+                    bq_table=s.bq_chunks_table,
+                )
+            except Exception:
+                logger.warning("Vector retriever init failed — BM25 only", exc_info=True)
+        else:
+            logger.info("No vertex_index_endpoint_id configured — BM25 only mode")
+
+        reranker = None
+        if os.environ.get("SKIP_RERANKER", "").lower() != "true":
+            try:
+                reranker = CrossEncoderReranker()
+            except Exception:
+                logger.warning("Reranker init failed — skipping reranking", exc_info=True)
+        else:
+            logger.info("Reranker disabled via SKIP_RERANKER env var")
+
+        llm = get_llm_provider()
+        prompts = PromptManager(prompts_dir="/app/prompts", version=s.prompt_version)
+        grader = AnswerGrader(llm, prompts)
+
+        pipeline = RAGPipeline(
+            bm25_retriever=bm25,
+            vector_retriever=vector,
+            embedding_provider=embed,
+            reranker=reranker,
+            llm_provider=llm,
+            prompt_manager=prompts,
+            grader=grader,
+        )
+        logger.info("Inference pipeline initialized (vector=%s, reranker=%s)",
+                     vector is not None, reranker is not None)
+    except Exception:
+        logger.warning("Pipeline init failed — running in degraded mode", exc_info=True)
     yield
 
 
@@ -85,6 +109,8 @@ class SuggestRequest(BaseModel):
 
 @app.post("/inference/chat")
 async def inference_chat(req: ChatRequest):
+    if pipeline is None:
+        return {"error": "Pipeline not initialized — check server logs"}
     result = await pipeline.run(
         req.question,
         history=req.history,
@@ -96,6 +122,8 @@ async def inference_chat(req: ChatRequest):
 
 @app.post("/inference/suggest")
 async def inference_suggest(req: SuggestRequest):
+    if pipeline is None:
+        return {"error": "Pipeline not initialized — check server logs"}
     result = await pipeline.suggest_reply(
         ticket_subject=req.ticket_subject,
         ticket_body=req.ticket_body,

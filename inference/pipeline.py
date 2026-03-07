@@ -74,11 +74,15 @@ class RAGPipeline:
         history = history or []
 
         bm25_results = self._bm25.search(question, top_k=top_k * 2)
-        query_emb = await self._embed.embed_single(question)
-        vec_results = await self._vector.search(query_emb, top_k=top_k * 2)
 
-        fused = reciprocal_rank_fusion(bm25_results, vec_results, k=60)
-        reranked = self._reranker.rerank(question, fused, top_k=top_k)
+        if self._vector and self._embed:
+            query_emb = await self._embed.embed_single(question)
+            vec_results = await self._vector.search(query_emb, top_k=top_k * 2)
+            fused = reciprocal_rank_fusion(bm25_results, vec_results, k=60)
+        else:
+            fused = bm25_results
+
+        reranked = self._reranker.rerank(question, fused, top_k=top_k) if self._reranker else fused[:top_k]
 
         system_prompt = self._prompts.render("system", company_name="Acme Corp")
         answer_prompt = self._prompts.render(
@@ -125,11 +129,15 @@ class RAGPipeline:
         history = history or []
 
         bm25_results = self._bm25.search(question, top_k=top_k * 2)
-        query_emb = await self._embed.embed_single(question)
-        vec_results = await self._vector.search(query_emb, top_k=top_k * 2)
 
-        fused = reciprocal_rank_fusion(bm25_results, vec_results, k=60)
-        reranked = self._reranker.rerank(question, fused, top_k=top_k)
+        if self._vector and self._embed:
+            query_emb = await self._embed.embed_single(question)
+            vec_results = await self._vector.search(query_emb, top_k=top_k * 2)
+            fused = reciprocal_rank_fusion(bm25_results, vec_results, k=60)
+        else:
+            fused = bm25_results
+
+        reranked = self._reranker.rerank(question, fused, top_k=top_k) if self._reranker else fused[:top_k]
 
         system_prompt = self._prompts.render("system", company_name="Acme Corp")
         answer_prompt = self._prompts.render(
@@ -163,11 +171,15 @@ class RAGPipeline:
         query = f"{ticket_subject} {ticket_body}"
 
         bm25_results = self._bm25.search(query, top_k=top_k * 2)
-        query_emb = await self._embed.embed_single(query)
-        vec_results = await self._vector.search(query_emb, top_k=top_k * 2)
 
-        fused = reciprocal_rank_fusion(bm25_results, vec_results, k=60)
-        reranked = self._reranker.rerank(query, fused, top_k=top_k)
+        if self._vector and self._embed:
+            query_emb = await self._embed.embed_single(query)
+            vec_results = await self._vector.search(query_emb, top_k=top_k * 2)
+            fused = reciprocal_rank_fusion(bm25_results, vec_results, k=60)
+        else:
+            fused = bm25_results
+
+        reranked = self._reranker.rerank(query, fused, top_k=top_k) if self._reranker else fused[:top_k]
 
         system_prompt = self._prompts.render("system", company_name="Acme Corp")
         reply_prompt = self._prompts.render(

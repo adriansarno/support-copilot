@@ -44,6 +44,13 @@ def _get_embedding_provider():
     )
 
 
+def _ingest_from_gcs(gs_url: str) -> list[Document]:
+    """Ingest from GCS gs://bucket/path."""
+    from acquisition.ingestors.gcs import GCSIngestor
+    ingestor = GCSIngestor()
+    return ingestor.ingest(gs_url)
+
+
 def _ingest_dir(source_dir: Path) -> list[Document]:
     """Auto-detect source types in directory and ingest all."""
     docs: list[Document] = []
@@ -85,7 +92,7 @@ def _ingest_dir(source_dir: Path) -> list[Document]:
 
 @app.command()
 def run(
-    source_dir: Path = typer.Option(..., help="Directory containing source documents"),
+    source_dir: str = typer.Option(..., help="Directory or gs://bucket/path containing source documents"),
     chunk_method: str = typer.Option("recursive", help="Chunking method: recursive | semantic"),
     chunk_size: int = typer.Option(512, help="Chunk size in characters (recursive only)"),
     chunk_overlap: int = typer.Option(64, help="Chunk overlap (recursive only)"),
@@ -97,7 +104,10 @@ def run(
     settings = _get_settings()
 
     logger.info("Starting acquisition pipeline from %s", source_dir)
-    docs = _ingest_dir(source_dir)
+    if source_dir.startswith("gs://"):
+        docs = _ingest_from_gcs(source_dir)
+    else:
+        docs = _ingest_dir(Path(source_dir))
     if not docs:
         logger.warning("No documents found in %s", source_dir)
         raise typer.Exit(1)
@@ -142,10 +152,13 @@ def run(
 
 @app.command()
 def ingest_only(
-    source_dir: Path = typer.Option(..., help="Directory containing source documents"),
+    source_dir: str = typer.Option(..., help="Directory or gs://bucket/path containing source documents"),
 ):
     """Ingest documents without chunking/embedding (dry run)."""
-    docs = _ingest_dir(source_dir)
+    if source_dir.startswith("gs://"):
+        docs = _ingest_from_gcs(source_dir)
+    else:
+        docs = _ingest_dir(Path(source_dir))
     for doc in docs:
         typer.echo(f"  [{doc.source_type}] {doc.title} ({len(doc.content)} chars)")
 

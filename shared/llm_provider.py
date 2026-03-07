@@ -23,13 +23,25 @@ class LLMProvider:
 
     DEEPSEEK_BASE_URL = "https://api.deepseek.com"
 
-    def __init__(self, provider: str, model: str, *, api_key: str = ""):
+    def __init__(
+        self,
+        provider: str,
+        model: str,
+        *,
+        api_key: str = "",
+        gcp_project: str = "",
+        gcp_region: str = "us-central1",
+    ):
         self.provider = provider
         self.model = model
         self._api_key = api_key
 
         if provider == "gemini":
-            self._gemini = genai.Client()
+            self._gemini = genai.Client(
+                vertexai=True,
+                project=gcp_project or None,
+                location=gcp_region,
+            )
         elif provider in ("openai", "deepseek"):
             base_url = self.DEEPSEEK_BASE_URL if provider == "deepseek" else None
             self._openai = AsyncOpenAI(api_key=api_key, base_url=base_url)

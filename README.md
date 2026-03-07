@@ -151,74 +151,9 @@ support-copilot/
 └── Makefile               Common commands
 ```
 
-
-# How to test
-
-## API
-From root:  
-cd api  
-uv sync  
-cd ..  
-PYTHONPATH=$PWD uv run --directory api pytest tests/ -v  
-  
-  
-## Inference 
-
-PYTHONPATH=$PWD uv run --directory inference python -c "
-from inference.generation.prompt_manager import PromptManager
-pm = PromptManager(prompts_dir='$PWD/prompts', version='v1')
-rendered = pm.render('answer', chunks=[{'source_type': 'pdf', 'title': 'Test', 'content': 'Hello world'}], history=[], question='How does it work?')
-print(rendered[:300])
-print('---')
-print('Metadata:', pm.get_metadata('answer'))"  
-  
- 
-
-PYTHONPATH=$PWD uv run --directory inference python -c "
-from inference.generation.citations import CitationExtractor
-from inference.retrieval.bm25 import RetrievedChunk
-chunks = [
-    RetrievedChunk(chunk_id='a1', doc_id='d1', title='Return Policy', content='30 day returns...', source_type='pdf'),
-    RetrievedChunk(chunk_id='a2', doc_id='d2', title='Shipping FAQ', content='Free shipping...', source_type='html'),
-]
-text, citations = CitationExtractor().extract('Per [Source 1], returns are 30 days. See also [Source 2].', chunks)
-print('Citations found:', len(citations))
-for c in citations:
-    print(f'  [{c.source_index}] {c.title} ({c.source_type}) -> {c.chunk_id}')
-"  
-  
-
-PYTHONPATH=$PWD uv run --directory inference python -c "
-from inference.retrieval.hybrid import reciprocal_rank_fusion
-from inference.retrieval.bm25 import RetrievedChunk
-bm25 = [RetrievedChunk(chunk_id=f'c{i}', doc_id='d', title=f'Doc {i}', content='...', source_type='pdf', score=1.0/(i+1)) for i in range(5)]
-vec  = [RetrievedChunk(chunk_id=f'c{4-i}', doc_id='d', title=f'Doc {4-i}', content='...', source_type='pdf', score=1.0/(i+1)) for i in range(5)]
-fused = reciprocal_rank_fusion(bm25, vec, k=60)
-print(f'Merged {len(fused)} unique chunks from 2 lists:')
-for c in fused:
-    print(f'  {c.chunk_id}: RRF score={c.score:.6f}')
-"  
-  
-## UI
-  
-cd ui && npm install && npm run dev  
-   
-Then open http://localhost:3000 in your browser. You should see:  
-Landing page with the "Support Copilot" heading, 4 feature cards, and a "Start Chatting" button  
-Click "Start Chatting" to go to /chat -- you'll see the three-panel layout (sidebar, chat window, source trace panel)  
-The dark/light theme toggle in the header should work  
-API calls will fail (no backend running) but the UI structure, navigation, and styling should all render correctly  
-  
-## Docker build smoke test (no GCP needed)
-   
-docker build -t TAG_NAME SOURCE_FOLDER  
--t: tag  
-SOURCE_FOLDER: path to the folder containing the "Dockerfile" file  
-
-open -a docker  
-   
-docker build -t sc-api ./api
-docker build -t sc-inference ./inference
-docker build -t sc-ui ./ui
-docker build -t sc-acquisition ./acquisition
-docker build -t sc-training ./training
+Pulumi.dev.yaml:  
+config:  
+  gcp:project: your-gcp-project  
+  gcp:region: us-central1  
+  support-copilot-infra:environment: dev  
+# Run: pulumi config set --secret api_key <your-key>  

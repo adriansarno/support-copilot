@@ -28,13 +28,19 @@ class EmbeddingProvider:
         *,
         dimension: int = 256,
         api_key: str = "",
+        gcp_project: str = "",
+        gcp_region: str = "us-central1",
     ):
         self.provider = provider
         self.model = model
         self.dimension = dimension
 
         if provider == "vertex":
-            self._gemini = genai.Client()
+            self._gemini = genai.Client(
+                vertexai=True,
+                project=gcp_project or None,
+                location=gcp_region,
+            )
         elif provider == "openai":
             self._openai = AsyncOpenAI(api_key=api_key)
         else:

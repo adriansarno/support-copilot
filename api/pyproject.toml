@@ -6,14 +6,17 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.115.0",
+    "google-auth>=2.36.0",
     "google-cloud-bigquery>=3.27.0",
+    "google-cloud-storage>=2.18.0",
     "google-cloud-secret-manager>=2.21.0",
     "httpx>=0.28.0",
     "pydantic>=2.10.0",
     "pydantic-settings>=2.7.0",
+    "python-multipart>=0.0.9",
     "python-jose[cryptography]>=3.3.0",
     "sse-starlette>=2.2.0",
-    "uvicorn>=0.34.0",
+    "uvicorn[standard]>=0.34.0",
 ]
 
 [dependency-groups]

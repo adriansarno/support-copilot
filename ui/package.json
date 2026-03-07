@@ -23,6 +23,7 @@
     "uuid": "^11.0.2"
   },
   "devDependencies": {
+    "dotenv": "^16.4.5",
     "@tailwindcss/typography": "^0.5.15",
     "@types/node": "^22.0.0",
     "@types/react": "^18.3.0",

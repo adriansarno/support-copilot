@@ -17,3 +17,6 @@ out/
 .DS_Store
 model-cache/
 data/
+infra/Pulumi.*.yaml
+sample-docs/
+dev/

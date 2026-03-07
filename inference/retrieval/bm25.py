@@ -35,28 +35,34 @@ class BM25Retriever:
         if source_type:
             where_clause = f"AND source_type = '{source_type}'"
 
+        keywords = [w.strip() for w in query.split() if len(w.strip()) > 2]
+        if not keywords:
+            return []
+
+        like_clauses = " OR ".join(
+            f"LOWER(content) LIKE LOWER(@kw{i})" for i in range(len(keywords))
+        )
+
         sql = f"""
         SELECT
-            chunk_id, doc_id, title, content, source_type, metadata,
-            SEARCH_SCORE(content) AS score
+            chunk_id, doc_id, title, content, source_type, metadata
         FROM `{self._table_id}`
-        WHERE SEARCH(content, @query)
+        WHERE ({like_clauses})
         {where_clause}
-        ORDER BY score DESC
         LIMIT @top_k
         """
 
-        job_config = bigquery.QueryJobConfig(
-            query_parameters=[
-                bigquery.ScalarQueryParameter("query", "STRING", query),
-                bigquery.ScalarQueryParameter("top_k", "INT64", top_k),
-            ]
-        )
+        params = [
+            bigquery.ScalarQueryParameter(f"kw{i}", "STRING", f"%{kw}%")
+            for i, kw in enumerate(keywords)
+        ]
+        params.append(bigquery.ScalarQueryParameter("top_k", "INT64", top_k))
 
+        job_config = bigquery.QueryJobConfig(query_parameters=params)
         results = self._client.query(sql, job_config=job_config).result()
 
         chunks: list[RetrievedChunk] = []
-        for row in results:
+        for rank, row in enumerate(results):
             chunks.append(
                 RetrievedChunk(
                     chunk_id=row.chunk_id,
@@ -64,7 +70,7 @@ class BM25Retriever:
                     title=row.title,
                     content=row.content,
                     source_type=row.source_type,
-                    score=float(row.score),
+                    score=1.0 / (rank + 1),
                     metadata=row.metadata if row.metadata else {},
                 )
             )

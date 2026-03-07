@@ -1,10 +1,13 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { MessageSquare, Zap, FileText, ThumbsUp } from "lucide-react";
+import { MessageSquare, Zap, FileText, ThumbsUp, Upload } from "lucide-react";
+import UploadModal from "@/components/upload/UploadModal";
 
 export default function Home() {
   const router = useRouter();
+  const [showUpload, setShowUpload] = useState(false);
 
   const features = [
     {
@@ -38,13 +41,24 @@ export default function Home() {
             <p className="text-lg text-[hsl(var(--muted-foreground))]">
               AI-powered customer support assistant with RAG retrieval, citations, and answer grading.
             </p>
-            <button
-              onClick={() => router.push("/chat")}
-              className="mt-4 px-6 py-3 bg-[hsl(var(--brand))] text-white rounded-lg font-medium
-                         hover:opacity-90 transition text-sm"
-            >
-              Start Chatting
-            </button>
+            <div className="mt-4 flex gap-3 justify-center">
+              <button
+                onClick={() => router.push("/chat")}
+                className="px-6 py-3 bg-[hsl(var(--brand))] text-white rounded-lg font-medium
+                           hover:opacity-90 transition text-sm"
+              >
+                Start Chatting
+              </button>
+              <button
+                onClick={() => setShowUpload(true)}
+                className="px-6 py-3 border border-[hsl(var(--border))] rounded-lg font-medium
+                           hover:bg-[hsl(var(--muted))] transition text-sm flex items-center gap-2"
+              >
+                <Upload className="w-4 h-4" />
+                Upload Documents
+              </button>
+            </div>
+            {showUpload && <UploadModal onClose={() => setShowUpload(false)} />}
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
