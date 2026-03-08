@@ -53,6 +53,11 @@ class Settings(BaseSettings):
     # Prompt
     prompt_version: str = "v1"
 
+    # Guardrails
+    guardrails_enabled: bool = True
+    guardrails_input_max_len: int = 2000
+    guardrails_output_max_len: int = 4000
+
     # Inference service URL (used by API to call inference)
     inference_url: str = "http://localhost:8001"
 

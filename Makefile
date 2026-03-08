@@ -7,7 +7,7 @@ SHELL := /bin/bash
 .PHONY: up down logs
 
 up: ## Start API + inference + UI
-	docker compose up --build -d api inference ui
+	APP_VERSION=$$(cat VERSION 2>/dev/null || echo "dev") docker compose up --build -d api inference ui
 
 down: ## Stop all services
 	docker compose down
@@ -50,12 +50,14 @@ TAG      ?= latest
 
 .PHONY: build-all push-all
 
+VERSION ?= $(shell cat VERSION 2>/dev/null || echo "dev")
+
 build-all: ## Build all Docker images
 	docker build -t $(REGISTRY)/$(PROJECT)/$(REPO)/acquisition:$(TAG) ./acquisition
 	docker build -t $(REGISTRY)/$(PROJECT)/$(REPO)/training:$(TAG)    ./training
-	docker build -t $(REGISTRY)/$(PROJECT)/$(REPO)/inference:$(TAG)   ./inference
-	docker build -t $(REGISTRY)/$(PROJECT)/$(REPO)/api:$(TAG)         ./api
-	docker build -t $(REGISTRY)/$(PROJECT)/$(REPO)/ui:$(TAG)          ./ui
+	docker build --build-arg APP_VERSION=$(VERSION) -t $(REGISTRY)/$(PROJECT)/$(REPO)/inference:$(TAG)   ./inference
+	docker build --build-arg APP_VERSION=$(VERSION) -t $(REGISTRY)/$(PROJECT)/$(REPO)/api:$(TAG)         ./api
+	docker build --build-arg NEXT_PUBLIC_APP_VERSION=$(VERSION) -t $(REGISTRY)/$(PROJECT)/$(REPO)/ui:$(TAG)          ./ui
 
 push-all: ## Push all Docker images
 	docker push $(REGISTRY)/$(PROJECT)/$(REPO)/acquisition:$(TAG)

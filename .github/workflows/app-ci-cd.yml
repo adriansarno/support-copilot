@@ -45,13 +45,21 @@ jobs:
 
       - name: Build and push all images
         run: |
-          for svc in inference api ui; do
-            docker build -t $REGISTRY/$PROJECT/$REPO/$svc:${{ github.sha }} \
-                          -t $REGISTRY/$PROJECT/$REPO/$svc:latest \
-                          ./$svc
+          VERSION=$(cat VERSION 2>/dev/null || echo "dev")
+          for svc in inference api; do
+            docker build --build-arg APP_VERSION=$VERSION \
+              -t $REGISTRY/$PROJECT/$REPO/$svc:${{ github.sha }} \
+              -t $REGISTRY/$PROJECT/$REPO/$svc:latest \
+              ./$svc
             docker push $REGISTRY/$PROJECT/$REPO/$svc:${{ github.sha }}
             docker push $REGISTRY/$PROJECT/$REPO/$svc:latest
           done
+          docker build --build-arg NEXT_PUBLIC_APP_VERSION=$VERSION \
+            -t $REGISTRY/$PROJECT/$REPO/ui:${{ github.sha }} \
+            -t $REGISTRY/$PROJECT/$REPO/ui:latest \
+            ./ui
+          docker push $REGISTRY/$PROJECT/$REPO/ui:${{ github.sha }}
+          docker push $REGISTRY/$PROJECT/$REPO/ui:latest
 
       - name: Deploy inference to Cloud Run
         uses: google-github-actions/deploy-cloudrun@v2

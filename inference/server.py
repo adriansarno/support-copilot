@@ -135,4 +135,5 @@ async def inference_suggest(req: SuggestRequest):
 
 @app.get("/health")
 async def health():
-    return {"status": "ok"}
+    version = os.getenv("APP_VERSION", "dev")
+    return {"status": "ok", "version": version}

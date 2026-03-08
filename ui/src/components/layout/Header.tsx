@@ -11,6 +11,9 @@ export default function Header() {
       <div className="flex items-center gap-2">
         <MessageSquare className="w-5 h-5 text-[hsl(var(--brand))]" />
         <span className="font-semibold text-lg">Support Copilot</span>
+        <span className="text-xs text-[hsl(var(--muted-foreground))] font-normal">
+          v{process.env.NEXT_PUBLIC_APP_VERSION || "dev"}
+        </span>
       </div>
       <button
         onClick={toggle}

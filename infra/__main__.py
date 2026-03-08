@@ -152,9 +152,9 @@ for secret_name in ["openai-api-key", "deepseek-api-key", "wandb-api-key", "jwt-
 # Cloud Run Services
 # ---------------------------------------------------------------------------
 
-INFERENCE_TAG = "1772856289" # unix epoch - is the timestamp of the image
-API_TAG= "1772877424"
-UI_TAG = "1772876322" 
+INFERENCE_TAG = "1772945858" # unix epoch - is the timestamp of the image
+API_TAG= "1772945858"
+UI_TAG = "1772950623" 
 
 inference_service = gcp.cloudrunv2.Service(
     "inference-service",

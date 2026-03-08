@@ -10,6 +10,11 @@ from inference.retrieval.bm25 import RetrievedChunk
 from inference.retrieval.hybrid import reciprocal_rank_fusion
 from inference.generation.citations import CitationExtractor, Citation
 from inference.grading.grader import GradeResult
+from inference.guardrails import (
+    validate_input,
+    validate_output,
+    get_guardrails,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -73,6 +78,18 @@ class RAGPipeline:
     ) -> PipelineResult:
         history = history or []
 
+        enabled, input_max, output_max = get_guardrails()
+        if enabled:
+            passed, msg = validate_input(question, max_length=input_max)
+            if not passed:
+                return PipelineResult(
+                    answer=msg,
+                    citations=[],
+                    grade=None,
+                    chunks=[],
+                    prompt_metadata={},
+                )
+
         bm25_results = self._bm25.search(question, top_k=top_k * 2)
 
         if self._vector and self._embed:
@@ -102,7 +119,12 @@ class RAGPipeline:
         ]
 
         result = await self._llm.generate(messages)
-        answer_text, citations = self._cite.extract(result.text, reranked)
+        answer_text = result.text
+
+        if enabled:
+            _, answer_text = validate_output(answer_text, max_length=output_max)
+
+        citations = self._cite.extract(answer_text, reranked)
 
         grade = None
         if not skip_grading:
@@ -127,6 +149,13 @@ class RAGPipeline:
     ) -> AsyncIterator[str]:
         """Stream the answer tokens (no grading in streaming mode)."""
         history = history or []
+
+        enabled, input_max, _ = get_guardrails()
+        if enabled:
+            passed, msg = validate_input(question, max_length=input_max)
+            if not passed:
+                yield msg
+                return
 
         bm25_results = self._bm25.search(question, top_k=top_k * 2)
 
@@ -170,6 +199,18 @@ class RAGPipeline:
         """Generate a suggested customer-facing reply for a ticket."""
         query = f"{ticket_subject} {ticket_body}"
 
+        enabled, input_max, output_max = get_guardrails()
+        if enabled:
+            passed, msg = validate_input(query, max_length=input_max)
+            if not passed:
+                return PipelineResult(
+                    answer=msg,
+                    citations=[],
+                    grade=None,
+                    chunks=[],
+                    prompt_metadata={},
+                )
+
         bm25_results = self._bm25.search(query, top_k=top_k * 2)
 
         if self._vector and self._embed:
@@ -199,7 +240,12 @@ class RAGPipeline:
         ]
 
         result = await self._llm.generate(messages)
-        answer_text, citations = self._cite.extract(result.text, reranked)
+        answer_text = result.text
+
+        if enabled:
+            _, answer_text = validate_output(answer_text, max_length=output_max)
+
+        citations = self._cite.extract(answer_text, reranked)
         prompt_meta = self._prompts.get_metadata("suggest_reply")
 
         return PipelineResult(
