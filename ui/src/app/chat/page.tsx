@@ -61,12 +61,19 @@ export default function ChatPage() {
       setSources(resp.sources);
       setPromptMeta(resp.prompt_metadata);
       refreshChatList();
-    } catch (err) {
+    } catch (err: unknown) {
+      const detail =
+        err && typeof err === "object" && "response" in err
+          ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
+          : null;
+      const message =
+        detail ||
+        "Sorry, an error occurred. Please try again.";
       setMessages((prev) => [
         ...prev,
         {
           role: "assistant",
-          content: "Sorry, an error occurred. Please try again.",
+          content: message,
         },
       ]);
     } finally {

@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, Depends
+import httpx
+from fastapi import APIRouter, Depends, HTTPException
 
 from api.app.middleware.auth import verify_api_key
 from api.app.schemas.models import (
@@ -26,12 +27,22 @@ async def suggest_reply(
     req: SuggestReplyRequest,
     _key: str = Depends(verify_api_key),
 ):
-    result = await chat_service.call_inference_suggest(
-        ticket_subject=req.ticket_subject,
-        ticket_body=req.ticket_body,
-        agent_notes=req.agent_notes,
-        top_k=req.top_k,
-    )
+    try:
+        result = await chat_service.call_inference_suggest(
+            ticket_subject=req.ticket_subject,
+            ticket_body=req.ticket_body,
+            agent_notes=req.agent_notes,
+            top_k=req.top_k,
+        )
+    except (httpx.TimeoutException, httpx.ConnectError, httpx.HTTPStatusError) as e:
+        logger.warning("Inference unavailable: %s", e)
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "The demo app is booting up and may take a few minutes. "
+                "Please try again in 1–2 minutes."
+            ),
+        ) from e
 
     prompt_meta = result.get("prompt_metadata")
     pm = PromptMetadataResponse(**prompt_meta) if prompt_meta else None

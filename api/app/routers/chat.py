@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException
 
 from api.app.middleware.auth import verify_api_key
@@ -61,12 +62,22 @@ async def create_or_continue_chat(
 
     history = chat_service.get_history(chat_id)
 
-    result = await chat_service.call_inference_chat(
-        question=req.message,
-        history=history[:-1],
-        top_k=req.top_k,
-        skip_grading=req.skip_grading,
-    )
+    try:
+        result = await chat_service.call_inference_chat(
+            question=req.message,
+            history=history[:-1],
+            top_k=req.top_k,
+            skip_grading=req.skip_grading,
+        )
+    except (httpx.TimeoutException, httpx.ConnectError, httpx.HTTPStatusError) as e:
+        logger.warning("Inference unavailable: %s", e)
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "The demo app is booting up and may take a few minutes. "
+                "Please try again in 1–2 minutes."
+            ),
+        ) from e
 
     answer = result.get("answer", "")
     assistant_msg_id = chat_service.add_message(chat_id, "assistant", answer)

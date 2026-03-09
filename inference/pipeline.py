@@ -124,7 +124,7 @@ class RAGPipeline:
         if enabled:
             _, answer_text = validate_output(answer_text, max_length=output_max)
 
-        citations = self._cite.extract(answer_text, reranked)
+        _, citations = self._cite.extract(answer_text, reranked)
 
         grade = None
         if not skip_grading:
@@ -245,7 +245,7 @@ class RAGPipeline:
         if enabled:
             _, answer_text = validate_output(answer_text, max_length=output_max)
 
-        citations = self._cite.extract(answer_text, reranked)
+        _, citations = self._cite.extract(answer_text, reranked)
         prompt_meta = self._prompts.get_metadata("suggest_reply")
 
         return PipelineResult(

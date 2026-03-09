@@ -152,9 +152,9 @@ for secret_name in ["openai-api-key", "deepseek-api-key", "wandb-api-key", "jwt-
 # Cloud Run Services
 # ---------------------------------------------------------------------------
 
-INFERENCE_TAG = "1772945858" # unix epoch - is the timestamp of the image
-API_TAG= "1772945858"
-UI_TAG = "1772950623" 
+INFERENCE_TAG = "1772991990" # unix epoch - is the timestamp of the image
+API_TAG= "1773020117"
+UI_TAG = "1773020117" 
 
 inference_service = gcp.cloudrunv2.Service(
     "inference-service",
@@ -166,7 +166,10 @@ inference_service = gcp.cloudrunv2.Service(
             {
                 "image": f"{region}-docker.pkg.dev/{project}/images/inference:{INFERENCE_TAG}",
                 "ports": {"container_port": 8001},
-                "resources": {"limits": {"memory": "2Gi", "cpu": "2"}},
+                "resources": {
+                    "limits": {"memory": "2Gi", "cpu": "2"},
+                    "startup_cpu_boost": True,
+                },
                 "envs": [
                     {"name": "GCP_PROJECT", "value": project},
                     {"name": "GCP_REGION", "value": region},

@@ -46,9 +46,13 @@ export default function ChatWindow({
     <div className="flex flex-col h-full">
       <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
         {messages.length === 0 && (
-          <div className="flex-1 flex items-center justify-center h-full">
+          <div className="flex-1 flex flex-col items-center justify-center h-full gap-4 px-6">
             <p className="text-[hsl(var(--muted-foreground))] text-sm">
               Start a conversation by typing a message below.
+            </p>
+            <p className="text-xs text-[hsl(var(--muted-foreground))] text-center max-w-md">
+              The demo app may take a few minutes to boot up on first use. If your
+              first message times out, please wait 1–2 minutes and try again.
             </p>
           </div>
         )}

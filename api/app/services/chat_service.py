@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import uuid
@@ -14,6 +15,10 @@ import google.oauth2.id_token
 from api.app.config import get_api_settings
 
 logger = logging.getLogger(__name__)
+
+INFERENCE_TIMEOUT = 300.0
+INFERENCE_RETRIES = 3
+INFERENCE_RETRY_DELAY = 30
 
 
 def _get_identity_token(audience: str) -> str | None:
@@ -101,22 +106,36 @@ async def call_inference_chat(
     top_k: int = 10,
     skip_grading: bool = False,
 ) -> dict:
-    """Call the inference service /inference/chat endpoint."""
+    """Call the inference service /inference/chat endpoint with retries."""
     settings = get_api_settings()
     headers = _inference_headers(settings.inference_url)
-    async with httpx.AsyncClient(timeout=120.0) as client:
-        resp = await client.post(
-            f"{settings.inference_url}/inference/chat",
-            headers=headers,
-            json={
-                "question": question,
-                "history": history,
-                "top_k": top_k,
-                "skip_grading": skip_grading,
-            },
-        )
-        resp.raise_for_status()
-        return resp.json()
+    last_error: Exception | None = None
+
+    async with httpx.AsyncClient(timeout=INFERENCE_TIMEOUT) as client:
+        for attempt in range(INFERENCE_RETRIES):
+            try:
+                resp = await client.post(
+                    f"{settings.inference_url}/inference/chat",
+                    headers=headers,
+                    json={
+                        "question": question,
+                        "history": history,
+                        "top_k": top_k,
+                        "skip_grading": skip_grading,
+                    },
+                )
+                resp.raise_for_status()
+                return resp.json()
+            except (httpx.TimeoutException, httpx.ConnectError, httpx.HTTPStatusError) as e:
+                last_error = e
+                if attempt < INFERENCE_RETRIES - 1:
+                    logger.warning("Inference call failed (attempt %d/%d), retrying in %ds: %s",
+                                  attempt + 1, INFERENCE_RETRIES, INFERENCE_RETRY_DELAY, e)
+                    await asyncio.sleep(INFERENCE_RETRY_DELAY)
+                else:
+                    raise
+
+    raise last_error  # type: ignore
 
 
 async def call_inference_suggest(
@@ -126,19 +145,33 @@ async def call_inference_suggest(
     *,
     top_k: int = 8,
 ) -> dict:
-    """Call the inference service /inference/suggest endpoint."""
+    """Call the inference service /inference/suggest endpoint with retries."""
     settings = get_api_settings()
     headers = _inference_headers(settings.inference_url)
-    async with httpx.AsyncClient(timeout=120.0) as client:
-        resp = await client.post(
-            f"{settings.inference_url}/inference/suggest",
-            headers=headers,
-            json={
-                "ticket_subject": ticket_subject,
-                "ticket_body": ticket_body,
-                "agent_notes": agent_notes,
-                "top_k": top_k,
-            },
-        )
-        resp.raise_for_status()
-        return resp.json()
+    last_error: Exception | None = None
+
+    async with httpx.AsyncClient(timeout=INFERENCE_TIMEOUT) as client:
+        for attempt in range(INFERENCE_RETRIES):
+            try:
+                resp = await client.post(
+                    f"{settings.inference_url}/inference/suggest",
+                    headers=headers,
+                    json={
+                        "ticket_subject": ticket_subject,
+                        "ticket_body": ticket_body,
+                        "agent_notes": agent_notes,
+                        "top_k": top_k,
+                    },
+                )
+                resp.raise_for_status()
+                return resp.json()
+            except (httpx.TimeoutException, httpx.ConnectError, httpx.HTTPStatusError) as e:
+                last_error = e
+                if attempt < INFERENCE_RETRIES - 1:
+                    logger.warning("Inference suggest failed (attempt %d/%d), retrying in %ds: %s",
+                                  attempt + 1, INFERENCE_RETRIES, INFERENCE_RETRY_DELAY, e)
+                    await asyncio.sleep(INFERENCE_RETRY_DELAY)
+                else:
+                    raise
+
+    raise last_error  # type: ignore
