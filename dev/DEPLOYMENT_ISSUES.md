@@ -104,13 +104,13 @@ Summary of all issues encountered during the initial deployment of the Support C
 
 **Problem:** Pulumi warned `Compute Engine API has not been used in project`.
 
-**Fix:** `gcloud services enable compute.googleapis.com --project=support-copilot-1772757287`
+**Fix:** `gcloud services enable compute.googleapis.com --project=sarno-ai-sandbox`
 
 ### 2.3 Vertex AI API Not Enabled
 
 **Problem:** Embedding provider and LLM couldn't reach Vertex AI endpoints.
 
-**Fix:** `gcloud services enable aiplatform.googleapis.com --project=support-copilot-1772757287`
+**Fix:** `gcloud services enable aiplatform.googleapis.com --project=sarno-ai-sandbox`
 
 ### 2.4 Docker Images Not Found in Artifact Registry
 
