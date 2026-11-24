@@ -16,7 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from shared.config import get_settings
 from shared.embedding_provider import EmbeddingProvider
 from inference.retrieval.bm25 import BM25Retriever
-from inference.retrieval.vector import VectorRetriever
+from inference.retrieval.vector import BigQueryVectorRetriever, VectorRetriever
 from inference.reranker.cross_encoder import CrossEncoderReranker
 from inference.generation.llm_router import get_llm_provider
 from inference.generation.prompt_manager import PromptManager
@@ -46,8 +46,11 @@ async def lifespan(app: FastAPI):
         bm25 = BM25Retriever(s.gcp_project, s.bq_dataset, s.bq_chunks_table)
 
         vector = None
-        if s.vertex_index_endpoint_id:
-            try:
+        try:
+            if s.vector_search == "bigquery":
+                vector = BigQueryVectorRetriever(s.gcp_project, s.bq_dataset, s.bq_chunks_table)
+                logger.info("Vector search: BigQuery VECTOR_SEARCH")
+            elif s.vector_search == "vertex" and s.vertex_index_endpoint_id:
                 vector = VectorRetriever(
                     project=s.gcp_project,
                     region=s.gcp_region,
@@ -56,10 +59,11 @@ async def lifespan(app: FastAPI):
                     bq_dataset=s.bq_dataset,
                     bq_table=s.bq_chunks_table,
                 )
-            except Exception:
-                logger.warning("Vector retriever init failed — BM25 only", exc_info=True)
-        else:
-            logger.info("No vertex_index_endpoint_id configured — BM25 only mode")
+                logger.info("Vector search: Vertex AI endpoint")
+            else:
+                logger.info("Vector search off (vector_search=%s) — BM25 only", s.vector_search)
+        except Exception:
+            logger.warning("Vector retriever init failed — BM25 only", exc_info=True)
 
         reranker = None
         if os.environ.get("SKIP_RERANKER", "").lower() != "true":

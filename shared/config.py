@@ -28,6 +28,10 @@ class Settings(BaseSettings):
     # Vertex Vector Search
     vertex_index_id: str = ""
     vertex_index_endpoint_id: str = ""
+    # Vector search backend: "bigquery" (VECTOR_SEARCH on the chunks table, no cost
+    # while idle), "vertex" (needs vertex_index_endpoint_id; the endpoint is billed
+    # every hour it is deployed) or "none" (keyword search only).
+    vector_search: str = "bigquery"
 
     # LLM
     llm_provider: str = "gemini"  # openai | gemini | deepseek
