@@ -10,6 +10,8 @@ build/
 uv.lock
 # CI installs the API with `uv sync --frozen`, which needs its lock file.
 !api/uv.lock
+# The inference image also installs with `uv sync --frozen`.
+!inference/uv.lock
 
 node_modules/
 .next/
