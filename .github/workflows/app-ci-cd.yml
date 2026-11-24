@@ -25,7 +25,8 @@ jobs:
     if: contains(github.event.head_commit.message, '/deploy-app')
     needs: test
     runs-on: ubuntu-latest
-
+    # Same group as the infra workflow: only one pulumi up on the dev stack at a time.
+    concurrency: pulumi-stack-dev
     env:
       REGISTRY: us-central1-docker.pkg.dev
       PROJECT: ${{ secrets.GCP_PROJECT }}
@@ -40,52 +41,45 @@ jobs:
         with:
           credentials_json: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
 
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+
       - name: Configure Docker for Artifact Registry
-        run: gcloud auth configure-docker ${{ env.REGISTRY }} --quiet
+        run: gcloud auth configure-docker $REGISTRY --quiet
 
-      - name: Build and push all images
+      # Images are tagged with the commit and with "latest". Pulumi deploys whatever
+      # "latest" points to (see latest_image in infra/__main__.py).
+      - name: Build and push the images
         run: |
+          set -euo pipefail
+          IMAGES=$REGISTRY/$PROJECT/$REPO
           VERSION=$(cat VERSION 2>/dev/null || echo "dev")
+          # The Dockerfiles copy shared/ and prompts/, so the build context is the repository root.
           for svc in inference api; do
-            docker build --build-arg APP_VERSION=$VERSION \
-              -t $REGISTRY/$PROJECT/$REPO/$svc:${{ github.sha }} \
-              -t $REGISTRY/$PROJECT/$REPO/$svc:latest \
-              ./$svc
-            docker push $REGISTRY/$PROJECT/$REPO/$svc:${{ github.sha }}
-            docker push $REGISTRY/$PROJECT/$REPO/$svc:latest
+            docker build --build-arg APP_VERSION=$VERSION -f $svc/Dockerfile \
+              -t $IMAGES/$svc:${{ github.sha }} -t $IMAGES/$svc:latest .
           done
+          # Next.js writes NEXT_PUBLIC_* values into the page when the image is built.
+          API_URL=$(gcloud run services describe support-copilot-api --region $REGION --project $PROJECT --format='value(status.url)')
+          API_KEY=$(gcloud secrets versions access latest --secret support-copilot-api-key --project $PROJECT)
+          echo "::add-mask::$API_KEY"
           docker build --build-arg NEXT_PUBLIC_APP_VERSION=$VERSION \
-            -t $REGISTRY/$PROJECT/$REPO/ui:${{ github.sha }} \
-            -t $REGISTRY/$PROJECT/$REPO/ui:latest \
-            ./ui
-          docker push $REGISTRY/$PROJECT/$REPO/ui:${{ github.sha }}
-          docker push $REGISTRY/$PROJECT/$REPO/ui:latest
+            --build-arg NEXT_PUBLIC_API_URL=$API_URL --build-arg NEXT_PUBLIC_API_KEY=$API_KEY \
+            -f ui/Dockerfile -t $IMAGES/ui:${{ github.sha }} -t $IMAGES/ui:latest .
+          for svc in inference api ui; do
+            docker push --all-tags $IMAGES/$svc
+          done
 
-      - name: Deploy inference to Cloud Run
-        uses: google-github-actions/deploy-cloudrun@v2
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          service: support-copilot-inference
-          image: ${{ env.REGISTRY }}/${{ env.PROJECT }}/${{ env.REPO }}/inference:${{ github.sha }}
-          region: ${{ env.REGION }}
-          env_vars: |
-            GCP_PROJECT=${{ secrets.GCP_PROJECT }}
-            PROMPT_VERSION=v1
+          python-version: "3.12"
 
-      - name: Deploy API to Cloud Run
-        uses: google-github-actions/deploy-cloudrun@v2
+      - name: Deploy the new images with Pulumi
+        uses: pulumi/actions@v5
         with:
-          service: support-copilot-api
-          image: ${{ env.REGISTRY }}/${{ env.PROJECT }}/${{ env.REPO }}/api:${{ github.sha }}
-          region: ${{ env.REGION }}
-          env_vars: |
-            GCP_PROJECT=${{ secrets.GCP_PROJECT }}
-            INFERENCE_URL=https://support-copilot-inference-${{ env.REGION }}.a.run.app
-
-      - name: Deploy UI to Cloud Run
-        uses: google-github-actions/deploy-cloudrun@v2
-        with:
-          service: support-copilot-ui
-          image: ${{ env.REGISTRY }}/${{ env.PROJECT }}/${{ env.REPO }}/ui:${{ github.sha }}
-          region: ${{ env.REGION }}
-          env_vars: |
-            NEXT_PUBLIC_API_URL=https://support-copilot-api-${{ env.REGION }}.a.run.app
+          command: up
+          work-dir: infra
+          stack-name: dev
+        env:
+          PULUMI_ACCESS_TOKEN: ${{ secrets.PULUMI_ACCESS_TOKEN }}

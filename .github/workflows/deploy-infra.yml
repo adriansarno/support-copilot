@@ -9,6 +9,8 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    # Same group as the /deploy-app job: only one pulumi up on the dev stack at a time.
+    concurrency: pulumi-stack-dev
 
     steps:
       - uses: actions/checkout@v4

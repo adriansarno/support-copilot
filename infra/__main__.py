@@ -186,9 +186,17 @@ for secret_name in ["openai-api-key", "deepseek-api-key", "wandb-api-key", "jwt-
 # Cloud Run Services
 # ---------------------------------------------------------------------------
 
-INFERENCE_TAG = "1795514067" # unix epoch - is the timestamp of the image
-API_TAG= "1773020117"
-UI_TAG = "1773020117" 
+# Each service runs the image that the "latest" tag points to, pinned by its digest.
+# The /deploy-app CI job pushes new images as "latest" and then runs pulumi up, so
+# CI and a local pulumi up always deploy the same images and never undo each other.
+# The images must exist before the first pulumi up of a new stack.
+def latest_image(name: str) -> pulumi.Output[str]:
+    return gcp.artifactregistry.get_docker_image_output(
+        project=project,
+        location=region,
+        repository_id=docker_repo.repository_id,
+        image_name=f"{name}:latest",
+    ).self_link
 
 inference_service = gcp.cloudrunv2.Service(
     "inference-service",
@@ -199,7 +207,7 @@ inference_service = gcp.cloudrunv2.Service(
         "service_account": runtime_sa.email,
         "containers": [
             {
-                "image": f"{region}-docker.pkg.dev/{project}/support-copilot-images/inference:{INFERENCE_TAG}",
+                "image": latest_image("inference"),
                 "ports": {"container_port": 8001},
                 "resources": {
                     "limits": {"memory": "2Gi", "cpu": "2"},
@@ -256,7 +264,7 @@ api_service = gcp.cloudrunv2.Service(
         "service_account": runtime_sa.email,
         "containers": [
             {
-                "image": f"{region}-docker.pkg.dev/{project}/support-copilot-images/api:{API_TAG}",
+                "image": latest_image("api"),
                 "ports": {"container_port": 8000},
                 "resources": {"limits": {"memory": "1Gi", "cpu": "1"}},
                 "envs": api_envs,
@@ -282,7 +290,7 @@ ui_service = gcp.cloudrunv2.Service(
         "service_account": runtime_sa.email,
         "containers": [
             {
-                "image": f"{region}-docker.pkg.dev/{project}/support-copilot-images/ui:{UI_TAG}",
+                "image": latest_image("ui"),
                 "ports": {"container_port": 3000},
                 "resources": {"limits": {"memory": "512Mi", "cpu": "1"}},
                 "envs": [
