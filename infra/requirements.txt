@@ -1,2 +1,4 @@
-pulumi>=3.0.0
-pulumi-gcp>=8.0.0
+pulumi==3.225.1
+# Same provider version as the stack state; a newer major version shows
+# changes to every resource in the preview.
+pulumi-gcp==9.14.0

@@ -8,6 +8,8 @@ build/
 !.env.example
 .uv/
 uv.lock
+# CI installs the API with `uv sync --frozen`, which needs its lock file.
+!api/uv.lock
 
 node_modules/
 .next/
@@ -18,5 +20,7 @@ out/
 model-cache/
 data/
 infra/Pulumi.*.yaml
+# The dev stack's settings (project sarno-ai-sandbox); its secret is encrypted by Pulumi.
+!infra/Pulumi.dev.yaml
 sample-docs/
 dev/

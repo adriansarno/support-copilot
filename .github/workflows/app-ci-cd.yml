@@ -19,7 +19,7 @@ jobs:
         run: |
           pip install uv
           cd api && uv sync --frozen
-          cd api && uv run pytest tests/ -v
+          PYTHONPATH=.. uv run pytest tests/ -v
 
   deploy:
     if: contains(github.event.head_commit.message, '/deploy-app')

@@ -1,6 +1,6 @@
 config:
-  gcp:project: support-copilot-1772757287
+  gcp:project: sarno-ai-sandbox
   gcp:region: us-central1
   support-copilot:environment: dev
   support-copilot-infra:api_key:
-    secure: AAABAG3IoUajGh72eA6bmZJGs+cKNfiTQB+eTLngWmzLAVtqYVrp1qRQOFCbLnurmisFKNx0NcE/kiDdbIz/I7hlKkzQfJNsCJ7W8RNDPbudQJmd9IHE59dzKuO5HdMI
+    secure: AAABAJ+/4nnC50kXzb/uINiyby2kIunHBxR6srz0sHDcu8sriaQ7LuH8S+FJ1NjCplk3uj7SNsLJvMNZAAIEZqsmPIPQsZrTGHXtpSOt6IIWwJDkioaVMzvd/ERW2ALA
