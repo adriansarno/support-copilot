@@ -113,10 +113,14 @@ for role in ["roles/aiplatform.user", "roles/bigquery.jobUser"]:
         role=role,
         member=runtime_member,
     )
-gcp.bigquery.DatasetIamMember(
-    "runtime-dataset-reader",
+# Granted on the table, not the dataset: every update of the Dataset resource
+# (for example a label change) rewrites the dataset's access list and removes
+# grants made with DatasetIamMember. Table access (bigquery.IamMember) is a separate list.
+gcp.bigquery.IamMember(
+    "runtime-chunks-reader",
     project=project,
     dataset_id=bq_dataset.dataset_id,
+    table_id=bq_chunks_table.table_id,
     role="roles/bigquery.dataViewer",
     member=runtime_member,
 )

@@ -4,3 +4,5 @@ config:
   support-copilot:environment: dev
   support-copilot-infra:api_key:
     secure: AAABAJ+/4nnC50kXzb/uINiyby2kIunHBxR6srz0sHDcu8sriaQ7LuH8S+FJ1NjCplk3uj7SNsLJvMNZAAIEZqsmPIPQsZrTGHXtpSOt6IIWwJDkioaVMzvd/ERW2ALA
+  gcp:defaultLabels:
+    app: support-copilot
