@@ -152,7 +152,7 @@ for secret_name in ["openai-api-key", "deepseek-api-key", "wandb-api-key", "jwt-
 # Cloud Run Services
 # ---------------------------------------------------------------------------
 
-INFERENCE_TAG = "1772991990" # unix epoch - is the timestamp of the image
+INFERENCE_TAG = "1795514067" # unix epoch - is the timestamp of the image
 API_TAG= "1773020117"
 UI_TAG = "1773020117" 
 
@@ -175,6 +175,10 @@ inference_service = gcp.cloudrunv2.Service(
                     {"name": "GCP_REGION", "value": region},
                     {"name": "PROMPT_VERSION", "value": "v1"},
                     {"name": "SKIP_RERANKER", "value": "true"},
+                    # gemini-2.0-flash-001 is not available to projects created
+                    # after its cutoff; this preview model is served from "global" only.
+                    {"name": "LLM_MODEL", "value": "gemini-3-flash-preview"},
+                    {"name": "LLM_LOCATION", "value": "global"},
                 ],
                 "startup_probe": {
                     "http_get": {"path": "/health", "port": 8001},

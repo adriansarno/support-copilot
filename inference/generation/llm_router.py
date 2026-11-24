@@ -26,5 +26,5 @@ def get_llm_provider() -> LLMProvider:
         model=s.llm_model,
         api_key=api_key,
         gcp_project=s.gcp_project,
-        gcp_region=s.gcp_region,
+        gcp_region=s.llm_location or s.gcp_region,
     )

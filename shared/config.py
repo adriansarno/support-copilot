@@ -32,6 +32,10 @@ class Settings(BaseSettings):
     # LLM
     llm_provider: str = "gemini"  # openai | gemini | deepseek
     llm_model: str = "gemini-2.0-flash-001"
+    # Location for Gemini calls only. Empty means gcp_region. Newer Gemini models
+    # (for example gemini-3-flash-preview) are served only from "global", while
+    # BigQuery, embeddings and Vector Search stay in gcp_region.
+    llm_location: str = ""
 
     # Embedding
     embedding_provider: str = "vertex"  # vertex | openai
