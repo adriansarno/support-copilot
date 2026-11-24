@@ -29,7 +29,7 @@ jobs:
     env:
       REGISTRY: us-central1-docker.pkg.dev
       PROJECT: ${{ secrets.GCP_PROJECT }}
-      REPO: images
+      REPO: support-copilot-images
       REGION: us-central1
 
     steps:

@@ -73,30 +73,60 @@ bq_chats_table = gcp.bigquery.Table(
 # GCS Buckets
 # ---------------------------------------------------------------------------
 
+# Names carry the app name because other apps share the project.
 artifacts_bucket = gcp.storage.Bucket(
-    "artifacts-bucket",
-    name=f"{project}-artifacts",
+    "support-copilot-artifacts",
+    name=f"{project}-support-copilot-artifacts",
     location="US",
     uniform_bucket_level_access=True,
     project=project,
 )
 
 raw_docs_bucket = gcp.storage.Bucket(
-    "raw-docs-bucket",
-    name=f"{project}-raw-docs",
+    "support-copilot-raw-docs",
+    name=f"{project}-support-copilot-raw-docs",
     location="US",
     uniform_bucket_level_access=True,
     project=project,
 )
 
-# Grant API service (Cloud Run default compute SA) objectCreator for uploads
-proj = gcp.organizations.get_project(project_id=project)
-api_compute_sa = f"{proj.number}-compute@developer.gserviceaccount.com"
+# ---------------------------------------------------------------------------
+# Runtime service account
+# ---------------------------------------------------------------------------
+# The three Cloud Run services run as this account, not as the project's default
+# compute account, so the roles below do not extend to other apps in the project.
+# All grants are additive (IAMMember): they never remove other members.
+
+runtime_sa = gcp.serviceaccount.Account(
+    "runtime-sa",
+    account_id="support-copilot-run",
+    display_name="support-copilot Cloud Run services",
+    project=project,
+)
+runtime_member = runtime_sa.email.apply(lambda e: f"serviceAccount:{e}")
+
+# Inference: embeddings and Gemini (Vertex AI), and BM25 queries on BigQuery.
+for role in ["roles/aiplatform.user", "roles/bigquery.jobUser"]:
+    gcp.projects.IAMMember(
+        f"runtime-{role.split('/')[1]}",
+        project=project,
+        role=role,
+        member=runtime_member,
+    )
+gcp.bigquery.DatasetIamMember(
+    "runtime-dataset-reader",
+    project=project,
+    dataset_id=bq_dataset.dataset_id,
+    role="roles/bigquery.dataViewer",
+    member=runtime_member,
+)
+
+# API: document uploads to the raw-docs bucket.
 gcp.storage.BucketIAMMember(
     "raw-docs-api-upload",
     bucket=raw_docs_bucket.name,
     role="roles/storage.objectCreator",
-    member=f"serviceAccount:{api_compute_sa}",
+    member=runtime_member,
 )
 
 # ---------------------------------------------------------------------------
@@ -104,8 +134,8 @@ gcp.storage.BucketIAMMember(
 # ---------------------------------------------------------------------------
 
 docker_repo = gcp.artifactregistry.Repository(
-    "docker-repo",
-    repository_id="images",
+    "support-copilot-images",
+    repository_id="support-copilot-images",
     format="DOCKER",
     location=region,
     project=project,
@@ -117,19 +147,19 @@ docker_repo = gcp.artifactregistry.Repository(
 
 acquisition_topic = gcp.pubsub.Topic(
     "acquisition-events",
-    name="acquisition-events",
+    name="support-copilot-acquisition-events",
     project=project,
 )
 
 training_topic = gcp.pubsub.Topic(
     "training-events",
-    name="training-events",
+    name="support-copilot-training-events",
     project=project,
 )
 
 feedback_topic = gcp.pubsub.Topic(
     "feedback-events",
-    name="feedback-events",
+    name="support-copilot-feedback-events",
     project=project,
 )
 
@@ -162,9 +192,10 @@ inference_service = gcp.cloudrunv2.Service(
     location=region,
     project=project,
     template={
+        "service_account": runtime_sa.email,
         "containers": [
             {
-                "image": f"{region}-docker.pkg.dev/{project}/images/inference:{INFERENCE_TAG}",
+                "image": f"{region}-docker.pkg.dev/{project}/support-copilot-images/inference:{INFERENCE_TAG}",
                 "ports": {"container_port": 8001},
                 "resources": {
                     "limits": {"memory": "2Gi", "cpu": "2"},
@@ -194,6 +225,16 @@ inference_service = gcp.cloudrunv2.Service(
     },
 )
 
+# The API calls inference with an identity token, so it needs invoker on inference.
+gcp.cloudrunv2.ServiceIamMember(
+    "inference-invoker-runtime",
+    project=project,
+    location=region,
+    name=inference_service.name,
+    role="roles/run.invoker",
+    member=runtime_member,
+)
+
 api_envs = [
     {"name": "GCP_PROJECT", "value": project},
     {"name": "GCS_RAW_DOCS_BUCKET", "value": raw_docs_bucket.name},
@@ -208,9 +249,10 @@ api_service = gcp.cloudrunv2.Service(
     location=region,
     project=project,
     template={
+        "service_account": runtime_sa.email,
         "containers": [
             {
-                "image": f"{region}-docker.pkg.dev/{project}/images/api:{API_TAG}",
+                "image": f"{region}-docker.pkg.dev/{project}/support-copilot-images/api:{API_TAG}",
                 "ports": {"container_port": 8000},
                 "resources": {"limits": {"memory": "1Gi", "cpu": "1"}},
                 "envs": api_envs,
@@ -233,9 +275,10 @@ ui_service = gcp.cloudrunv2.Service(
     location=region,
     project=project,
     template={
+        "service_account": runtime_sa.email,
         "containers": [
             {
-                "image": f"{region}-docker.pkg.dev/{project}/images/ui:{UI_TAG}",
+                "image": f"{region}-docker.pkg.dev/{project}/support-copilot-images/ui:{UI_TAG}",
                 "ports": {"container_port": 3000},
                 "resources": {"limits": {"memory": "512Mi", "cpu": "1"}},
                 "envs": [
@@ -255,6 +298,7 @@ pulumi.export("bq_dataset", bq_dataset.dataset_id)
 pulumi.export("artifacts_bucket", artifacts_bucket.url)
 pulumi.export("raw_docs_bucket", raw_docs_bucket.url)
 pulumi.export("docker_repo", docker_repo.id)
+pulumi.export("runtime_service_account", runtime_sa.email)
 pulumi.export("inference_url", inference_service.uri)
 pulumi.export("api_url", api_service.uri)
 pulumi.export("ui_url", ui_service.uri)
